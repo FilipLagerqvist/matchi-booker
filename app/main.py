@@ -10,6 +10,7 @@ def run_once() -> None:
     client = MatchiClient(
         email=settings.matchi_email,
         password=settings.matchi_password,
+        facility_url=settings.facility_url,
         headless=settings.headless
     )
 

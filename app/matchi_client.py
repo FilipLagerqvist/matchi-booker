@@ -17,9 +17,10 @@ class MatchiSession:
 
 
 class MatchiClient:
-    def __init__(self, email: str, password: str, headless: bool = False):
+    def __init__(self, email: str, password: str, facility_url: str, headless: bool = False):
         self.email = email
         self.password = password
+        self.facility_url = facility_url
         self.headless = headless
 
     def start(self) -> MatchiSession:
