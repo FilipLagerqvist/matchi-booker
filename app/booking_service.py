@@ -33,6 +33,15 @@ class BookingService:
             page = session.page
             page.screenshot(path="debug_facility_page.png")
             #print(f"Opened facility page for {target_date} at {target_time}")
+            
+            date_ok = self.go_to_target_date(page, target_date)
+            # expected_date = self.format_matchi_date(target_date)
+            # current_date = page.locator("#picker_daily").inner_text().strip()
+
+            if not date_ok:
+
+                return False
+            
             found = self.find_and_click_first_free_slot(
                 page=page,
                 target_time=target_time,
@@ -78,38 +87,73 @@ class BookingService:
         return False
     
     def find_and_click_first_free_slot(self, page, target_time: str, duration_minutes: int) -> bool:
-        free_slots = page.locator("td.slot.free")
-        count = free_slots.count()
+        rows = page.locator("#schedule-table tbody tr").all()
 
-        print(f"Found {count} free slots on page")
+        for row_index, row in enumerate(rows):
+            court_label_locator =row.locator("td.court")
 
-        for i in range(count):
-            slot = free_slots.nth(i)
-
-            tooltip = slot.get_attribute("data-original-title") or ""
-            slot_duration = slot.get_attribute("data-slot-duration") or ""
-            slot_id = slot.get_attribute("slotid")
-
-            if not slot_id:
+            if court_label_locator.count() == 0:
                 continue
 
-            if slot_duration != str(duration_minutes):
-                continue
+            court_name = court_label_locator.inner_text().strip().strip()
+            free_slots = row.locator("td.slot.free")
+            slot_count = free_slots.count()
 
-            if self.slot_matches_time(tooltip, target_time):
-                link_selector = f"a#s{slot_id}"
-                print(f"Matching slot found: slotid={slot_id}, tooltip={tooltip}")
+            for i in range(slot_count):
+                slot = free_slots.nth(i)
+                tooltip = slot.get_attribute("data-original-title") or ""
+                slot_duration = slot.get_attribute("data-slot-duration") or ""
+                slotId = slot.get_attribute("slotid")
 
-                page.locator(link_selector).click()
-                page.wait_for_timeout(1500)
+                if not slotId:
+                    continue
 
-                return True
-            
+                if slot_duration != str(duration_minutes):
+                    continue
+
+                if self.slot_matches_time(tooltip, target_time):
+                    print(f"Found matching slot on {court_name}: {tooltip}")
+
+                    try:
+                        slot.click(timeout=3000)
+                    except Exception as e:
+                        print(f"Visible slot click failed, trying hidden booking link: {e}")
+                        page.locator(f"a#s{slotId}").evaluate("el => el.click()")
+                    
+                    page.wait_for_timeout(2000)
+                    
+                    return True
+
         return False
-    
+
     def slot_matches_time(self, tooltip: str, target_time: str) -> bool:
         """Tooltip example: 'Available<br>1. Tennis<br> 12:00 - 13:00'
         """
         normalized = tooltip.replace("&lt;br&gt;", " ").replace("<br>", " ").strip()
 
         return f"{target_time} -" in normalized
+    
+    def format_matchi_date(self, target_date: str) -> str:
+        date_obj = datetime.strptime(target_date, "%Y-%m-%d")
+        
+        return date_obj.strftime("%A %d %B")
+    
+    def go_to_target_date(self, page, target_date: str, max_clicks: int = 15) -> bool:
+        expected_date = self.format_matchi_date(target_date)
+
+        for i in range(max_clicks + 1):
+            current_date = page.locator("#picker_daily").inner_text().strip()
+
+            print(f"Current date: {current_date}")
+            print(f"Target date: {expected_date}")
+
+            if current_date == expected_date:
+                return True
+            
+            page.locator("i.ti-angle-right").click()
+            page.wait_for_load_state("networkidle")
+            page.wait_for_timeout(700)
+
+        print("Failed to navigate to target date within max clicks")
+        
+        return False

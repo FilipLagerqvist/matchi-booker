@@ -36,11 +36,20 @@ class MatchiClient:
         page.goto("https://www.matchi.se/login", wait_until="domcontentloaded")
 
         # May need to adjust selectors
-        page.locator('input[type="email"]').fill(self.email)
-        page.locator('input[type="password"]').fill(self.password)
+        email_field = page.locator(
+            'input[type="email"], input[name*="email" i], input[name*="username" i], input[type="text"]'
+        ).first
+        # page.locator('input[type="email"]').fill(self.email)
+        password_field = page.locator('input[type="password"]').first
+        email_field.fill(self.email)
+        password_field.fill(self.password)
         page.locator('button[type="submit"]').click()
 
-        page.wait_for_load_state("networkidle")
+        try:
+            page.wait_for_load_state("networkidle", timeout=5000)
+        except Exception:
+            print("Network did not become idle after login; continuing anyway.")
+        page.wait_for_timeout(2000)
         time.sleep(2)
 
     def open_facility(self, session: MatchiSession, facility_url: str) -> None:
